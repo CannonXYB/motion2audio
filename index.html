@@ -1,0 +1,1075 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <title>摄像头手势识别二次元互动小游戏</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+
+  <!-- ====== 网络预连接 ====== -->
+  <link rel="preconnect" href="https://cdn.jsdelivr.net">
+  <link rel="dns-prefetch" href="https://cdn.jsdelivr.net">
+
+  <style>
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      min-height: 100vh;
+      font-family: "Microsoft YaHei", system-ui, sans-serif;
+      color: #fff;
+      background:
+        radial-gradient(circle at 20% 20%, rgba(255, 159, 243, 0.5), transparent 30%),
+        radial-gradient(circle at 80% 10%, rgba(116, 185, 255, 0.45), transparent 30%),
+        linear-gradient(135deg, #2d1b69, #111827 55%, #1f2937);
+      overflow-x: hidden;
+    }
+
+    .app {
+      width: min(1200px, 96vw);
+      margin: 0 auto;
+      padding: 24px 0 40px;
+    }
+
+    h1 {
+      text-align: center;
+      font-size: 30px;
+      margin: 10px 0 8px;
+      letter-spacing: 1px;
+    }
+
+    .subtitle {
+      text-align: center;
+      color: #dbeafe;
+      margin-bottom: 18px;
+      font-size: 15px;
+    }
+
+    .panel {
+      display: grid;
+      grid-template-columns: 1.08fr 0.92fr;
+      gap: 22px;
+      align-items: stretch;
+    }
+
+    @media (max-width: 900px) {
+      .panel { grid-template-columns: 1fr; }
+    }
+
+    .card {
+      position: relative;
+      border: 1px solid rgba(255, 255, 255, 0.18);
+      background: rgba(15, 23, 42, 0.62);
+      backdrop-filter: blur(14px);
+      box-shadow: 0 18px 50px rgba(0, 0, 0, 0.35);
+      border-radius: 24px;
+      padding: 18px;
+      overflow: hidden;
+    }
+
+    /* ====== 摄像头区 ====== */
+    .camera-box {
+      position: relative;
+      width: 100%;
+      aspect-ratio: 4 / 3;
+      background: #020617;
+      border-radius: 18px;
+      overflow: hidden;
+      border: 1px solid rgba(255, 255, 255, 0.16);
+    }
+
+    video, canvas {
+      position: absolute;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      transform: scaleX(-1);
+    }
+    video { background: #000; }
+
+    .camera-placeholder {
+      position: absolute;
+      inset: 0;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      text-align: center;
+      padding: 30px;
+      color: #cbd5e1;
+      z-index: 3;
+      background: linear-gradient(135deg, rgba(15, 23, 42, 0.8), rgba(30, 41, 59, 0.8));
+    }
+    .camera-placeholder.hidden { display: none; }
+
+    /* ====== 加载进度条 ====== */
+    .loading-section {
+      width: 100%;
+      max-width: 320px;
+      margin: 12px auto 0;
+    }
+    .loading-bar-track {
+      width: 100%;
+      height: 8px;
+      border-radius: 999px;
+      background: rgba(255, 255, 255, 0.12);
+      overflow: hidden;
+    }
+    .loading-bar-fill {
+      height: 100%;
+      width: 0%;
+      border-radius: 999px;
+      background: linear-gradient(90deg, #f9a8d4, #93c5fd, #a78bfa);
+      transition: width 0.3s ease;
+    }
+    .loading-text {
+      display: block;
+      margin-top: 8px;
+      font-size: 13px;
+      color: #94a3b8;
+    }
+    .loading-status-ok { color: #86efac; }
+    .loading-status-error { color: #fca5a5; }
+
+    /* ====== 按钮与工具栏 ====== */
+    .toolbar {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      align-items: center;
+      justify-content: space-between;
+      margin-top: 14px;
+    }
+
+    .toolbar-left, .toolbar-right {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      align-items: center;
+    }
+
+    button {
+      border: 0;
+      border-radius: 999px;
+      padding: 12px 20px;
+      font-size: 15px;
+      font-weight: 700;
+      cursor: pointer;
+      color: #1f2937;
+      background: linear-gradient(135deg, #f9a8d4, #93c5fd);
+      box-shadow: 0 10px 26px rgba(147, 197, 253, 0.26);
+      transition: 0.2s;
+    }
+    button:hover {
+      transform: translateY(-1px);
+      box-shadow: 0 14px 28px rgba(249, 168, 212, 0.32);
+    }
+    button:disabled {
+      cursor: not-allowed;
+      opacity: 0.55;
+      transform: none;
+    }
+
+    /* 关闭摄像头按钮使用红色系 */
+    .btn-danger {
+      background: linear-gradient(135deg, #fca5a5, #f87171);
+      box-shadow: 0 10px 26px rgba(248, 113, 113, 0.26);
+      color: #fff;
+    }
+    .btn-danger:hover {
+      box-shadow: 0 14px 28px rgba(248, 113, 113, 0.32);
+    }
+
+    .stats {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 10px;
+      margin-top: 14px;
+    }
+    .stat {
+      background: rgba(255, 255, 255, 0.08);
+      border: 1px solid rgba(255, 255, 255, 0.12);
+      border-radius: 16px;
+      padding: 12px;
+      min-height: 74px;
+    }
+    .stat .label {
+      color: #bfdbfe;
+      font-size: 13px;
+      margin-bottom: 5px;
+    }
+    .stat .value {
+      font-size: 18px;
+      font-weight: 800;
+      word-break: break-all;
+    }
+
+    /* ====== 角色舞台（右侧卡片） ====== */
+    .character-stage {
+      min-height: 500px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: flex-end;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .speech {
+      align-self: stretch;
+      margin-bottom: 20px;
+      padding: 16px 18px;
+      border-radius: 18px;
+      background: rgba(255, 255, 255, 0.9);
+      color: #334155;
+      font-weight: 700;
+      line-height: 1.6;
+      position: relative;
+      box-shadow: 0 14px 30px rgba(0, 0, 0, 0.18);
+    }
+    .speech::after {
+      content: "";
+      position: absolute;
+      left: 50%;
+      bottom: -12px;
+      transform: translateX(-50%);
+      border-width: 12px 12px 0 12px;
+      border-style: solid;
+      border-color: rgba(255, 255, 255, 0.9) transparent transparent transparent;
+    }
+
+    /* ====== 图片角色容器 ====== */
+    .avatar-wrap {
+      position: relative;
+      width: 280px;
+      height: 360px;
+      display: grid;
+      place-items: center;
+    }
+
+    .avatar-img {
+      max-width: 100%;
+      max-height: 100%;
+      object-fit: contain;
+      border-radius: 12px;
+      transition: transform 0.2s ease;
+      /* 闲置呼吸动画 */
+      animation: idleBreath 2.4s ease-in-out infinite;
+      transform-origin: center;
+    }
+
+    .avatar-img.react-peace {
+      animation: peaceDance 0.65s ease-in-out 3;
+    }
+
+    .avatar-img.react-heart {
+      animation: heartPop 0.8s ease-in-out 3;
+    }
+
+    .floating {
+      position: absolute;
+      font-size: 26px;
+      pointer-events: none;
+      animation: floatUp 1.8s ease-out forwards;
+      z-index: 10;
+    }
+
+    .task-banner {
+      margin-bottom: 14px;
+      padding: 12px 14px;
+      border-radius: 16px;
+      background: rgba(255, 255, 255, 0.08);
+      border: 1px solid rgba(255, 255, 255, 0.12);
+      color: #dbeafe;
+      line-height: 1.6;
+    }
+
+    .debug {
+      margin-top: 12px;
+      color: #cbd5e1;
+      font-size: 13px;
+      line-height: 1.6;
+    }
+
+    .tip-list {
+      margin-top: 14px;
+      color: #dbeafe;
+      font-size: 14px;
+      line-height: 1.7;
+    }
+    .tip-list code {
+      background: rgba(255, 255, 255, 0.12);
+      padding: 2px 6px;
+      border-radius: 6px;
+    }
+
+    /* ====== 动画关键帧 ====== */
+    @keyframes idleBreath {
+      0%, 100% { transform: translateY(0) scale(1); }
+      50% { transform: translateY(-6px) scale(1.015); }
+    }
+    @keyframes peaceDance {
+      0%, 100% { transform: translateY(0) rotate(0deg) scale(1); }
+      25% { transform: translateY(-16px) rotate(-7deg) scale(1.04); }
+      50% { transform: translateY(0) rotate(7deg) scale(1.02); }
+      75% { transform: translateY(-10px) rotate(-4deg) scale(1.04); }
+    }
+    @keyframes heartPop {
+      0%, 100% { transform: scale(1) rotate(0deg); }
+      35% { transform: scale(1.15) rotate(-4deg); }
+      70% { transform: scale(1.07) rotate(4deg); }
+    }
+    @keyframes floatUp {
+      0% { opacity: 0; transform: translateY(20px) scale(0.7) rotate(0deg); }
+      20% { opacity: 1; }
+      100% { opacity: 0; transform: translateY(-160px) scale(1.5) rotate(25deg); }
+    }
+  </style>
+</head>
+<body>
+  <div class="app">
+    <h1>摄像头手势识别二次元互动小游戏</h1>
+    <div class="subtitle">
+      做出"比耶"或"比心"，右侧角色会播放动画和语音回应
+    </div>
+
+    <div class="panel">
+      <!-- ====== 左侧：摄像头面板 ====== -->
+      <section class="card">
+        <div class="camera-box">
+          <video id="webcam" autoplay muted playsinline></video>
+          <canvas id="overlay"></canvas>
+          <div id="cameraPlaceholder" class="camera-placeholder">
+            <div>
+              <div style="font-size: 46px; margin-bottom: 10px;">📷</div>
+              <div>点击下方按钮启动摄像头</div>
+              <div style="font-size: 13px; margin-top: 8px; color: #94a3b8;">
+                首次使用会弹出摄像头权限请求
+              </div>
+              <div id="loadingSection" class="loading-section">
+                <div class="loading-bar-track">
+                  <div id="loadingBarFill" class="loading-bar-fill"></div>
+                </div>
+                <span id="loadingText" class="loading-text">正在准备模型...</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="toolbar">
+          <div class="toolbar-left">
+            <button id="startBtn" disabled>模型准备中...</button>
+            <button id="nextBtn" disabled>换一个任务</button>
+          </div>
+          <div class="toolbar-right">
+            <button id="closeCamBtn" class="btn-danger" disabled>关闭摄像头</button>
+          </div>
+        </div>
+
+        <div class="stats">
+          <div class="stat">
+            <div class="label">当前任务</div>
+            <div id="taskText" class="value">等待开始</div>
+          </div>
+          <div class="stat">
+            <div class="label">识别结果</div>
+            <div id="gestureText" class="value">无</div>
+          </div>
+          <div class="stat">
+            <div class="label">分数</div>
+            <div id="scoreText" class="value">0</div>
+          </div>
+        </div>
+
+        <div class="tip-list">
+          <div>测试提示：</div>
+          <ul>
+            <li>比耶：单手伸出食指和中指，尽量正对摄像头。</li>
+            <li>比心：可以尝试双手比心，让两个食指指尖靠近、两个拇指指尖靠近。</li>
+            <li>如果识别不稳定，请保证光线充足，手离摄像头不要太近。</li>
+          </ul>
+        </div>
+
+        <div id="debug" class="debug"></div>
+      </section>
+
+      <!-- ====== 右侧：角色舞台 ====== -->
+      <section class="card character-stage">
+        <div class="task-banner">
+          <strong>玩法：</strong>
+          系统会随机要求你做"比耶"或"比心"。完成任务后角色会回应，并自动切换下一个任务。
+        </div>
+
+        <div id="speech" class="speech">
+          你好呀！点击开始后，对着摄像头做动作吧。
+        </div>
+
+        <div class="avatar-wrap">
+          <img id="avatarImg" class="avatar-img"
+               src="Snipaste_2026-05-10_20-26-49.png"
+               alt="二次元角色">
+        </div>
+      </section>
+    </div>
+  </div>
+
+  <script type="module">
+    import {
+      GestureRecognizer,
+      FilesetResolver
+    } from "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.3";
+
+    // ====================================================================
+    // DOM 引用
+    // ====================================================================
+    const video = document.getElementById("webcam");
+    const canvas = document.getElementById("overlay");
+    const ctx = canvas.getContext("2d");
+    const startBtn = document.getElementById("startBtn");
+    const nextBtn = document.getElementById("nextBtn");
+    const closeCamBtn = document.getElementById("closeCamBtn");
+    const taskText = document.getElementById("taskText");
+    const gestureText = document.getElementById("gestureText");
+    const scoreText = document.getElementById("scoreText");
+    const speech = document.getElementById("speech");
+    const avatarImg = document.getElementById("avatarImg");
+    const debug = document.getElementById("debug");
+    const cameraPlaceholder = document.getElementById("cameraPlaceholder");
+    const loadingBarFill = document.getElementById("loadingBarFill");
+    const loadingText = document.getElementById("loadingText");
+    const loadingSection = document.getElementById("loadingSection");
+
+    // ====================================================================
+    // 常量
+    // ====================================================================
+    const LOCAL_MODEL_URL = "gesture_recognizer.task";
+    const FALLBACK_MODEL_URL =
+      "https://storage.googleapis.com/mediapipe-models/gesture_recognizer/gesture_recognizer/float16/1/gesture_recognizer.task";
+    const WASM_BASE = "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.3/wasm";
+    const CACHE_NAME = "bx-gesture-model-v1";
+    // 音频文件路径：比耶使用 SOUND_URL1，比心使用 SOUND_URL2
+    const SOUND_URL1 = "record1.MP3";
+    const SOUND_URL2 = "record2.MP3";
+
+    // ====================================================================
+    // 状态
+    // ====================================================================
+    let recognizer = null;
+    let running = false;
+    let lastVideoTime = -1;
+
+    let score = 0;
+    let currentTask = "peace";
+    let lastTriggerTime = 0;
+
+    let stableCandidate = "none";
+    let stableCount = 0;
+
+    // 预加载状态
+    let preloadInited = false;
+    let preloadReady = false;
+    let preloadPromise = null;
+
+    // 音频对象（缓存，避免重复创建）
+    let audioCtx = null;
+    let audioBuffer1 = null;   // 比耶：record1_不用在意.mp3
+    let audioBuffer2 = null;   // 比心：record2——干了这些.mp3
+    let audioLoading = false;
+
+    const TASKS = [
+      {
+        id: "peace",
+        label: "比耶 ✌️",
+        reactionText: "不用在意，没事的。毕竟咱是个忍者嘛，这点儿只是咱还是懂滴",
+        emoji: "✨"
+      },
+      {
+        id: "heart",
+        label: "比心 🫶",
+        reactionText: "干了这些，不禁产生了约会的想法",
+        emoji: "💗"
+      }
+    ];
+
+    // ====================================================================
+    // 音频播放：使用本地 mp3（预先加载到内存）
+    // ====================================================================
+
+    /** 预加载两个音频文件到内存中 */
+    async function preloadAudio() {
+      if (audioBuffer1 && audioBuffer2) return;
+      if (audioLoading) return;
+      audioLoading = true;
+
+      try {
+        audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+
+        // 并行加载两个音频文件
+        const [resp1, resp2] = await Promise.all([
+          fetch(SOUND_URL1),
+          fetch(SOUND_URL2)
+        ]);
+
+        const [buf1, buf2] = await Promise.all([
+          resp1.arrayBuffer(),
+          resp2.arrayBuffer()
+        ]);
+
+        // 并行解码
+        const [decoded1, decoded2] = await Promise.all([
+          audioCtx.decodeAudioData(buf1),
+          audioCtx.decodeAudioData(buf2)
+        ]);
+
+        audioBuffer1 = decoded1;
+        audioBuffer2 = decoded2;
+        console.log(`音频加载完成：${((buf1.byteLength + buf2.byteLength) / 1024 / 1024).toFixed(1)} MB`);
+      } catch (e) {
+        console.warn("音频加载失败，将使用 SpeechSynthesis 降级：", e);
+      } finally {
+        audioLoading = false;
+      }
+    }
+
+    /**
+     * 播放音频
+     * @param {"peace"|"heart"} type - 手势类型，比耶播 SOUND_URL1，比心播 SOUND_URL2
+     */
+    function playSound(type) {
+      const buffer = type === "heart" ? audioBuffer2 : audioBuffer1;
+
+      // 降级方案：如果音频加载失败，用 SpeechSynthesis
+      if (!buffer || !audioCtx) {
+        if ("speechSynthesis" in window) {
+          window.speechSynthesis.cancel();
+          const text = type === "heart" ? "干了这些" : "不用在意";
+          const utter = new SpeechSynthesisUtterance(text);
+          utter.lang = "zh-CN";
+          utter.rate = 1.0;
+          utter.pitch = 1.2;
+          window.speechSynthesis.speak(utter);
+        }
+        return;
+      }
+
+      // 唤醒 AudioContext（浏览器要求用户交互后才能播放）
+      if (audioCtx.state === "suspended") {
+        audioCtx.resume();
+      }
+
+      // 每次创建一个新的 BufferSource，实现叠加播放
+      const source = audioCtx.createBufferSource();
+      source.buffer = buffer;
+
+      source.connect(audioCtx.destination);
+      source.start(0);
+    }
+
+    // ====================================================================
+    // UI 更新工具
+    // ====================================================================
+
+    function setDebug(text) {
+      debug.textContent = text;
+    }
+
+    function updateLoading(percent, text, isError = false) {
+      const pct = Math.max(0, Math.min(1, percent));
+      loadingBarFill.style.width = `${Math.round(pct * 100)}%`;
+      loadingText.textContent = text;
+      loadingText.className = "loading-text" +
+        (pct >= 1 && !isError ? " loading-status-ok" : "") +
+        (isError ? " loading-status-error" : "");
+    }
+
+    function updateStartBtn(ready, label) {
+      startBtn.disabled = !ready;
+      startBtn.textContent = label;
+    }
+
+    function randomTask() {
+      const item = TASKS[Math.floor(Math.random() * TASKS.length)];
+      currentTask = item.id;
+      taskText.textContent = item.label;
+      speech.textContent = `现在的任务是：${item.label}。快试试看吧！`;
+    }
+
+    nextBtn.addEventListener("click", randomTask);
+
+    // ====================================================================
+    // 预加载系统
+    // ====================================================================
+
+    function startPreloading() {
+      if (preloadInited) return;
+      preloadInited = true;
+
+      loadingSection.style.display = "block";
+      updateLoading(0, "正在准备模型...");
+
+      // 音频也预加载
+      preloadAudio();
+
+      preloadPromise = (async () => {
+        const [modelArrayBuffer, vision] = await Promise.all([
+          loadModelWithProgress(),
+          FilesetResolver.forVisionTasks(WASM_BASE)
+        ]);
+
+        updateLoading(0.9, "正在初始化识别器...");
+        const rec = await createRecognizerWithFallback(vision, modelArrayBuffer);
+
+        updateLoading(1, "模型就绪 ✓ 可以开始游戏了！");
+        return rec;
+      })();
+
+      preloadPromise
+        .then((rec) => {
+          recognizer = rec;
+          preloadReady = true;
+          updateStartBtn(true, "🚀 启动摄像头并开始游戏");
+        })
+        .catch((err) => {
+          console.warn("后台预加载失败，点击按钮后将重新尝试：", err);
+          updateLoading(0, "预加载失败，点击按钮重试", true);
+          updateStartBtn(false, "点击重新加载模型");
+        });
+    }
+
+    async function loadModelWithProgress() {
+      try {
+        const cache = await caches.open(CACHE_NAME);
+        const cachedResponse = await cache.match(LOCAL_MODEL_URL);
+        if (cachedResponse) {
+          const buffer = await cachedResponse.arrayBuffer();
+          updateLoading(1, "使用缓存模型 ✓");
+          return buffer;
+        }
+      } catch (e) {}
+
+      let url = LOCAL_MODEL_URL;
+      let usingFallback = false;
+      let response;
+      try {
+        response = await fetch(url, { cache: "no-cache" });
+        if (!response.ok) throw new Error(`HTTP ${response.status}`);
+      } catch (e) {
+        console.warn("本地模型文件加载失败，回退到远程模型：", e.message);
+        url = FALLBACK_MODEL_URL;
+        usingFallback = true;
+        response = await fetch(url);
+      }
+
+      const contentLength = response.headers.get("content-length");
+      const total = contentLength ? parseInt(contentLength, 10) : 0;
+      const reader = response.body.getReader();
+      const chunks = [];
+      let loaded = 0;
+
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        chunks.push(value);
+        loaded += value.length;
+
+        if (total > 0) {
+          const pct = loaded / total;
+          const label = usingFallback
+            ? `从远程服务器加载模型 ${Math.round(pct * 100)}%`
+            : `加载本地模型 ${Math.round(pct * 100)}%`;
+          updateLoading(pct, label);
+        } else {
+          updateLoading(0.5, `正在加载模型 (${(loaded / 1024 / 1024).toFixed(1)} MB)`);
+        }
+      }
+
+      const blob = new Blob(chunks);
+      const arrayBuffer = await blob.arrayBuffer();
+
+      try {
+        const cache = await caches.open(CACHE_NAME);
+        const cacheResp = new Response(blob, {
+          headers: { "Content-Type": "application/octet-stream" }
+        });
+        await cache.put(LOCAL_MODEL_URL, cacheResp);
+      } catch (e) {}
+
+      return arrayBuffer;
+    }
+
+    async function createRecognizerWithFallback(vision, modelArrayBuffer) {
+      const modelData = new Uint8Array(modelArrayBuffer);
+
+      try {
+        return await GestureRecognizer.createFromOptions(vision, {
+          baseOptions: { modelAssetBuffer: modelData, delegate: "GPU" },
+          runningMode: "VIDEO",
+          numHands: 2
+        });
+      } catch (e) {
+        console.warn("GPU 模式初始化失败，回退到 CPU 模式：", e);
+        return await GestureRecognizer.createFromOptions(vision, {
+          baseOptions: { modelAssetBuffer: modelData, delegate: "CPU" },
+          runningMode: "VIDEO",
+          numHands: 2
+        });
+      }
+    }
+
+    // ====================================================================
+    // 摄像头
+    // ====================================================================
+
+    async function initCamera() {
+      const stream = await navigator.mediaDevices.getUserMedia({
+        video: { width: { ideal: 640 }, height: { ideal: 480 }, facingMode: "user" },
+        audio: false
+      });
+
+      video.srcObject = stream;
+      await new Promise((resolve) => { video.onloadedmetadata = () => resolve(); });
+      await video.play();
+
+      canvas.width = video.videoWidth;
+      canvas.height = video.videoHeight;
+    }
+
+    /** 关闭摄像头：停止所有轨道，重置 UI */
+    function stopCamera() {
+      if (video.srcObject) {
+        const tracks = video.srcObject.getTracks();
+        tracks.forEach(t => t.stop());
+        video.srcObject = null;
+      }
+      running = false;
+
+      // 重置 UI
+      closeCamBtn.disabled = true;
+      startBtn.disabled = false;
+      startBtn.textContent = "重新启动摄像头";
+      nextBtn.disabled = true;
+      cameraPlaceholder.classList.remove("hidden");
+      taskText.textContent = "等待开始";
+      gestureText.textContent = "无";
+      speech.textContent = "摄像头已关闭，点击「重新启动摄像头」继续游戏";
+      setDebug("摄像头已关闭");
+    }
+
+    closeCamBtn.addEventListener("click", stopCamera);
+
+    // ====================================================================
+    // 启动流程
+    // ====================================================================
+
+    startBtn.addEventListener("click", async () => {
+      startBtn.disabled = true;
+      startBtn.textContent = "正在启动...";
+
+      try {
+        if (!preloadReady) {
+          startBtn.textContent = "正在加载模型...";
+          updateLoading(0.3, "正在加载模型...");
+
+          if (preloadPromise) {
+            try {
+              recognizer = await preloadPromise;
+            } catch {
+              recognizer = await loadOnTheFly();
+            }
+          } else {
+            recognizer = await loadOnTheFly();
+          }
+          preloadReady = true;
+        }
+
+        startBtn.textContent = "正在启动摄像头...";
+        await initCamera();
+        running = true;
+
+        nextBtn.disabled = false;
+        closeCamBtn.disabled = false;
+        startBtn.textContent = "游戏运行中";
+        cameraPlaceholder.classList.add("hidden");
+
+        randomTask();
+        setDebug("模型和摄像头已启动。请在摄像头前做动作。");
+
+        requestAnimationFrame(predictLoop);
+      } catch (err) {
+        console.error(err);
+        startBtn.disabled = false;
+        startBtn.textContent = "启动失败，点击重试";
+        setDebug("启动失败：" + err.message);
+        alert("启动失败：\n" + err.message + "\n\n请确认：\n1. 已授予摄像头权限\n2. 通过 localhost 或 https 打开页面\n3. 网络可连接 CDN 服务器");
+      }
+    });
+
+    async function loadOnTheFly() {
+      updateLoading(0.2, "正在加载模型...");
+      const [vision, modelArrayBuffer] = await Promise.all([
+        FilesetResolver.forVisionTasks(WASM_BASE),
+        (async () => {
+          try {
+            const cache = await caches.open(CACHE_NAME);
+            const cached = await cache.match(LOCAL_MODEL_URL);
+            if (cached) {
+              updateLoading(0.8, "从缓存恢复模型...");
+              return await cached.arrayBuffer();
+            }
+          } catch {}
+
+          try {
+            const resp = await fetch(LOCAL_MODEL_URL);
+            if (resp.ok) {
+              updateLoading(0.7, "加载本地模型...");
+              const buf = await resp.arrayBuffer();
+              try {
+                const cache = await caches.open(CACHE_NAME);
+                await cache.put(LOCAL_MODEL_URL, new Response(buf));
+              } catch {}
+              return buf;
+            }
+          } catch {}
+
+          updateLoading(0.5, "从远程服务器加载模型...");
+          const resp = await fetch(FALLBACK_MODEL_URL);
+          return await resp.arrayBuffer();
+        })()
+      ]);
+
+      updateLoading(0.9, "正在初始化识别器...");
+      const rec = await createRecognizerWithFallback(vision, modelArrayBuffer);
+      updateLoading(1, "模型就绪 ✓");
+      return rec;
+    }
+
+    // ====================================================================
+    // 预测循环
+    // ====================================================================
+
+    function predictLoop() {
+      if (!running || !recognizer) return;
+
+      if (video.currentTime !== lastVideoTime) {
+        lastVideoTime = video.currentTime;
+        const now = performance.now();
+        const result = recognizer.recognizeForVideo(video, now);
+
+        drawResult(result);
+        const detected = parseGesture(result);
+        updateStableGesture(detected);
+      }
+
+      requestAnimationFrame(predictLoop);
+    }
+
+    function parseGesture(result) {
+      const modelGestures = [];
+
+      if (result.gestures && result.gestures.length > 0) {
+        for (const handGestures of result.gestures) {
+          if (handGestures && handGestures.length > 0) {
+            modelGestures.push(handGestures[0].categoryName);
+          }
+        }
+      }
+
+      let detected = "none";
+      if (modelGestures.includes("Victory")) detected = "peace";
+      if (isHeartGesture(result)) detected = "heart";
+
+      const readable = { none: "无", peace: "比耶 ✌️", heart: "比心 🫶" };
+      gestureText.textContent = readable[detected] || detected;
+
+      const modelText = modelGestures.length ? modelGestures.join(", ") : "无";
+      setDebug(`模型原始识别：${modelText}；当前稳定候选：${stableCandidate} x ${stableCount}`);
+
+      return detected;
+    }
+
+    function updateStableGesture(detected) {
+      if (detected === stableCandidate) {
+        stableCount++;
+      } else {
+        stableCandidate = detected;
+        stableCount = 1;
+      }
+
+      const needFrames = 7;
+      const cooldown = 2200;
+      const now = Date.now();
+
+      if (detected !== "none" && stableCount >= needFrames && now - lastTriggerTime > cooldown) {
+        lastTriggerTime = now;
+
+        if (detected === currentTask) {
+          handleSuccess(detected);
+        } else {
+          handleWrongGesture(detected);
+        }
+      }
+    }
+
+    function handleSuccess(type) {
+      score++;
+      scoreText.textContent = String(score);
+
+      const task = TASKS.find(t => t.id === type);
+
+      // 播放语音：比耶播 record1，比心播 record2
+      playSound(type);
+
+      // 更新气泡文字
+      speech.textContent = task.reactionText;
+
+      // 角色动画
+      playAvatarAnimation(type === "peace" ? "react-peace" : "react-heart");
+
+      // 飘浮特效
+      burst(task.emoji, type === "peace" ? 12 : 16);
+
+      setTimeout(() => { randomTask(); }, 1700);
+    }
+
+    function handleWrongGesture(type) {
+      const name = type === "peace" ? "比耶" : "比心";
+      speech.textContent = `识别到你做了「${name}」，但当前任务不是这个哦～`;
+    }
+
+    function playAvatarAnimation(className) {
+      avatarImg.classList.remove("react-peace", "react-heart");
+      void avatarImg.offsetWidth;
+      avatarImg.classList.add(className);
+      setTimeout(() => {
+        avatarImg.classList.remove(className);
+      }, 2300);
+    }
+
+    function burst(emoji, count) {
+      for (let i = 0; i < count; i++) {
+        const span = document.createElement("span");
+        span.className = "floating";
+        span.textContent = emoji;
+        span.style.left = `${80 + Math.random() * 130}px`;
+        span.style.top = `${150 + Math.random() * 90}px`;
+        span.style.animationDelay = `${Math.random() * 0.25}s`;
+        // append to avatar's parent (character-stage section)
+        span.style.position = "absolute";
+        avatarImg.parentElement.appendChild(span);
+        setTimeout(() => span.remove(), 2200);
+      }
+    }
+
+    // ====================================================================
+    // 手部关键点绘制
+    // ====================================================================
+
+    function drawResult(result) {
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      if (!result.landmarks) return;
+      for (const landmarks of result.landmarks) {
+        drawHandLandmarks(landmarks);
+      }
+    }
+
+    function drawHandLandmarks(landmarks) {
+      const connections = [
+        [0,1],[1,2],[2,3],[3,4],
+        [0,5],[5,6],[6,7],[7,8],
+        [5,9],[9,10],[10,11],[11,12],
+        [9,13],[13,14],[14,15],[15,16],
+        [13,17],[17,18],[18,19],[19,20],
+        [0,17]
+      ];
+
+      ctx.lineWidth = 3;
+      ctx.strokeStyle = "rgba(96, 165, 250, 0.95)";
+      ctx.fillStyle = "rgba(249, 168, 212, 0.95)";
+
+      for (const [a, b] of connections) {
+        const pa = landmarks[a];
+        const pb = landmarks[b];
+        ctx.beginPath();
+        ctx.moveTo(pa.x * canvas.width, pa.y * canvas.height);
+        ctx.lineTo(pb.x * canvas.width, pb.y * canvas.height);
+        ctx.stroke();
+      }
+
+      for (const p of landmarks) {
+        ctx.beginPath();
+        ctx.arc(p.x * canvas.width, p.y * canvas.height, 5, 0, Math.PI * 2);
+        ctx.fill();
+      }
+    }
+
+    // ====================================================================
+    // 比心检测算法
+    // ====================================================================
+
+    function isHeartGesture(result) {
+      if (!result.landmarks || result.landmarks.length === 0) return false;
+      const hands = result.landmarks;
+
+      for (const hand of hands) {
+        if (isSingleHandFingerHeart(hand)) return true;
+      }
+      if (hands.length >= 2) {
+        if (isTwoHandHeart(hands[0], hands[1])) return true;
+      }
+      return false;
+    }
+
+    function isSingleHandFingerHeart(hand) {
+      const thumbTip = hand[4];
+      const indexTip = hand[8];
+      const palmSize = distance(hand[0], hand[9]);
+      const thumbIndexDist = distance(thumbTip, indexTip);
+      const middleExtended = isFingerExtended(hand, 12, 10);
+      const ringExtended = isFingerExtended(hand, 16, 14);
+      const pinkyExtended = isFingerExtended(hand, 20, 18);
+
+      const pinch = thumbIndexDist < palmSize * 0.72;
+      const otherFingersCurled = !middleExtended && !ringExtended && !pinkyExtended;
+      return pinch && otherFingersCurled;
+    }
+
+    function isTwoHandHeart(handA, handB) {
+      const palmA = distance(handA[0], handA[9]);
+      const palmB = distance(handB[0], handB[9]);
+      const palm = (palmA + palmB) / 2;
+
+      const indexTipsClose = distance(handA[8], handB[8]) < palm * 0.95;
+      const thumbTipsClose = distance(handA[4], handB[4]) < palm * 1.05;
+      const indexMid = midpoint(handA[8], handB[8]);
+      const thumbMid = midpoint(handA[4], handB[4]);
+
+      const verticalShape = indexMid.y < thumbMid.y;
+      const enoughHeight = distance(indexMid, thumbMid) > palm * 0.35;
+      return indexTipsClose && thumbTipsClose && verticalShape && enoughHeight;
+    }
+
+    function isFingerExtended(hand, tipIndex, pipIndex) {
+      const wrist = hand[0];
+      const tip = hand[tipIndex];
+      const pip = hand[pipIndex];
+      return distance(wrist, tip) > distance(wrist, pip) * 1.08;
+    }
+
+    function distance(a, b) {
+      const dx = a.x - b.x;
+      const dy = a.y - b.y;
+      const dz = (a.z || 0) - (b.z || 0);
+      return Math.sqrt(dx * dx + dy * dy + dz * dz);
+    }
+
+    function midpoint(a, b) {
+      return { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2, z: ((a.z || 0) + (b.z || 0)) / 2 };
+    }
+
+    // ====================================================================
+    // 🚀 启动入口
+    // ====================================================================
+    startPreloading();
+  </script>
+</body>
+</html>
