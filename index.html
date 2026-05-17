@@ -303,6 +303,36 @@
       border-radius: 6px;
     }
 
+    /* ====== 角色选择按钮 ====== */
+    .char-selector {
+      display: flex;
+      flex-wrap: wrap;
+      gap:40px;
+      margin-bottom: 50px;
+      justify-content: center;
+    }
+    .char-btn {
+      padding: 8px 14px;
+      font-size: 16px;
+      font-weight: 600;
+      border-radius: 999px;
+      border: 1px solid rgba(255,255,255,0.2);
+      background: rgba(255,255,255,0.08);
+      color: #e2e8f0;
+      cursor: pointer;
+      transition: 0.2s;
+    }
+    .char-btn:hover {
+      background: rgba(255,255,255,0.18);
+      transform: translateY(-1px);
+    }
+    .char-btn.active {
+      background: linear-gradient(135deg, #f9a8d4, #93c5fd);
+      color: #1f2937;
+      border-color: transparent;
+      font-weight: 700;
+    }
+
     /* ====== 动画关键帧 ====== */
     @keyframes idleBreath {
       0%, 100% { transform: translateY(0) scale(1); }
@@ -330,7 +360,7 @@
   <div class="app">
     <h1>摄像头手势识别二次元互动小游戏</h1>
     <div class="subtitle">
-      做出"比耶"或"比心"，右侧角色会播放动画和语音回应
+      做出各种手势，右侧角色会播放动画和语音回应
     </div>
 
     <div class="panel">
@@ -386,6 +416,8 @@
           <ul>
             <li>比耶：单手伸出食指和中指，尽量正对摄像头。</li>
             <li>比心：可以尝试双手比心，让两个食指指尖靠近、两个拇指指尖靠近。</li>
+            <li>点赞：竖起大拇指。握拳：握紧拳头。停：五指张开。</li>
+            <li>指人：伸出一根食指向上。我爱你：伸出拇指、食指和小指。</li>
             <li>如果识别不稳定，请保证光线充足，手离摄像头不要太近。</li>
           </ul>
         </div>
@@ -395,9 +427,23 @@
 
       <!-- ====== 右侧：角色舞台 ====== -->
       <section class="card character-stage">
+        <!-- ====== 角色选择按钮组 ====== -->
+        <div class="char-selector">
+          <button class="char-btn" data-char="1">常陆茉子</button>
+          <button class="char-btn" data-char="2">古河渚</button>
+          <button class="char-btn" data-char="3">小木曾雪菜</button>
+          <!-- =
+          <button class="char-btn" data-char="4">角色4</button>
+          <button class="char-btn" data-char="5">角色5</button>
+          <button class="char-btn" data-char="6">角色6</button>
+          <button class="char-btn" data-char="7">角色7</button>
+          <button class="char-btn" data-char="8">角色8</button>
+          === -->
+        </div>
+
         <div class="task-banner">
           <strong>玩法：</strong>
-          系统会随机要求你做"比耶"或"比心"。完成任务后角色会回应，并自动切换下一个任务。
+          系统会随机要求你做各种手势。完成任务后角色会回应，并自动切换下一个任务。
         </div>
 
         <div id="speech" class="speech">
@@ -406,7 +452,7 @@
 
         <div class="avatar-wrap">
           <img id="avatarImg" class="avatar-img"
-               src="Snipaste_2026-05-10_20-26-49.png"
+               src="角色1/avatar.png"
                alt="二次元角色">
         </div>
       </section>
@@ -442,14 +488,56 @@
     // ====================================================================
     // 常量
     // ====================================================================
+    // ====================================================================
+    // 角色配置
+    // ====================================================================
+    const CURRENT_CHAR = { index: '1' };  // 当前选中的角色编号
+
+    /** 角色文件夹路径前缀 */
+    function charFolder(idx) {
+      return `角色${idx}`;
+    }
+
+    /** 获取当前角色的图片路径 */
+    function currentAvatarPath() {
+      return `${charFolder(CURRENT_CHAR.index)}/avatar.png`;
+    }
+
+    /** 当前角色的音频映射 - 根据当前角色动态构建 */
+    function currentSoundMap() {
+      const base = charFolder(CURRENT_CHAR.index);
+      // 角色1 使用自定义文件名：record1.MP3（比耶）、record2.MP3（比心）
+      if (CURRENT_CHAR.index === '1') {
+        return {
+          peace:      `${base}/peace.MP3`,
+          heart:      `${base}/heart.MP3`,
+          thumbsup:   `${base}/thumbsup.mp3`,
+          openpalm:   `${base}/openpalm.mp3`,
+          pointingup: `${base}/pointingup.mp3`,
+          iloveyou:   `${base}/iloveyou.mp3`,
+          thumbsdown: `${base}/thumbsdown.mp3`,
+        };
+      }
+      // 其他角色使用通用命名规则
+      return {
+        peace:      `${base}/peace.mp3`,
+        heart:      `${base}/heart.mp3`,
+        thumbsup:   `${base}/thumbsup.mp3`,
+        openpalm:   `${base}/openpalm.mp3`,
+        pointingup: `${base}/pointingup.mp3`,
+        iloveyou:   `${base}/iloveyou.mp3`,
+        thumbsdown: `${base}/thumbsdown.mp3`,
+      };
+    }
+
+    /** 默认音频映射（基于角色1的初始配置） */
+    const SOUND_MAP = currentSoundMap();
+
     const LOCAL_MODEL_URL = "gesture_recognizer.task";
     const FALLBACK_MODEL_URL =
       "https://storage.googleapis.com/mediapipe-models/gesture_recognizer/gesture_recognizer/float16/1/gesture_recognizer.task";
     const WASM_BASE = "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.3/wasm";
     const CACHE_NAME = "bx-gesture-model-v1";
-    // 音频文件路径：比耶使用 SOUND_URL1，比心使用 SOUND_URL2
-    const SOUND_URL1 = "record1.MP3";
-    const SOUND_URL2 = "record2.MP3";
 
     // ====================================================================
     // 状态
@@ -472,8 +560,7 @@
 
     // 音频对象（缓存，避免重复创建）
     let audioCtx = null;
-    let audioBuffer1 = null;   // 比耶：record1_不用在意.mp3
-    let audioBuffer2 = null;   // 比心：record2——干了这些.mp3
+    const audioBuffers = {};   // key = 任务 id, value = AudioBuffer
     let audioLoading = false;
 
     const TASKS = [
@@ -481,49 +568,150 @@
         id: "peace",
         label: "比耶 ✌️",
         reactionText: "不用在意，没事的。毕竟咱是个忍者嘛，这点儿只是咱还是懂滴",
-        emoji: "✨"
+        emoji: "✨",
+        textDuration: 6000
       },
       {
         id: "heart",
         label: "比心 🫶",
         reactionText: "干了这些，不禁产生了约会的想法",
-        emoji: "💗"
+        emoji: "💗",
+        textDuration: 9000
+      },
+      {
+        id: "thumbsup",
+        label: "点赞 👍",
+        reactionText: "点赞！好眼光！",
+        emoji: "👍",
+        textDuration: 6000
+      },
+      {
+        id: "openpalm",
+        label: "停 🖐️",
+        reactionText: "停！就是这里！",
+        emoji: "✋",
+        textDuration: 8000
+      },
+      {
+        id: "pointingup",
+        label: "指人 ☝️",
+        reactionText: "就是你！",
+        emoji: "☝️",
+        textDuration: 7000
+      },
+      {
+        id: "iloveyou",
+        label: "我爱你 🤟",
+        reactionText: "我也爱你！",
+        emoji: "🤟",
+        textDuration: 5000
+      },
+      {
+        id: "thumbsdown",
+        label: "不 👎",
+        reactionText: "不可以哦～",
+        emoji: "👎",
+        textDuration: 7000
       }
     ];
 
+    let subtitles = {};
+
+    /** 加载指定角色的字幕文件 subtitles.json */
+    async function loadSubtitles(charIndex) {
+      const url = `${charFolder(charIndex)}/subtitles.json`;
+      try {
+        const resp = await fetch(url);
+        if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+        subtitles = await resp.json();
+        console.log(`角色 ${charIndex} 字幕加载完成`);
+      } catch (e) {
+        console.warn(`角色 ${charIndex} 字幕加载失败，将使用默认文字：`, e);
+        subtitles = {};  // 加载失败则清空，后续会 fallback 到 TASKS 的 reactionText
+      }
+    }
+
+    /** 获取当前角色指定手势的字幕（如无则返回空字符串） */
+    function getSubtitle(type) {
+      return subtitles[type] || '';
+    }
+
+
+    // ====================================================================
+    // 角色切换
+    // ====================================================================
+
+    /** 切换角色：更换图片、加载字幕、重新加载音频、清理旧缓存 */
+    async function switchCharacter(charIndex) {
+      CURRENT_CHAR.index = charIndex;
+
+      // 1. 切换头像图片
+      avatarImg.src = currentAvatarPath();
+
+      // 2. 更新按钮激活态
+      document.querySelectorAll('.char-btn').forEach(btn => {
+        btn.classList.toggle('active', btn.dataset.char === charIndex);
+      });
+
+      // 3. 加载当前角色的字幕文件（subtitles.json）
+      await loadSubtitles(charIndex);
+
+      // 4. 重新加载音频（清空旧缓存 + 重新预加载）
+      Object.keys(audioBuffers).forEach(k => delete audioBuffers[k]);
+      // 替换音频映射指向当前角色
+      await preloadAudioWithMap(currentSoundMap());
+
+      // 5. 更新对话气泡提示
+      speech.textContent = `已切换到角色 ${charIndex}！`;
+    }
     // ====================================================================
     // 音频播放：使用本地 mp3（预先加载到内存）
     // ====================================================================
 
-    /** 预加载两个音频文件到内存中 */
-    async function preloadAudio() {
-      if (audioBuffer1 && audioBuffer2) return;
-      if (audioLoading) return;
+    /**
+     * 预加载音频（支持自定义 soundMap）
+     * @param {Object} soundMap - 手势 id → 音频 URL 的映射
+     */
+    async function preloadAudioWithMap(soundMap) {
+      if (!soundMap) soundMap = SOUND_MAP;
       audioLoading = true;
 
       try {
-        audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        if (!audioCtx) {
+          audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        }
 
-        // 并行加载两个音频文件
-        const [resp1, resp2] = await Promise.all([
-          fetch(SOUND_URL1),
-          fetch(SOUND_URL2)
-        ]);
+        const ids = Object.keys(soundMap);
+        const urls = Object.values(soundMap);
 
-        const [buf1, buf2] = await Promise.all([
-          resp1.arrayBuffer(),
-          resp2.arrayBuffer()
-        ]);
+        // 并行 fetch 所有音频文件
+        const responses = await Promise.allSettled(urls.map(url => fetch(url)));
+        const validResults = [];
 
-        // 并行解码
-        const [decoded1, decoded2] = await Promise.all([
-          audioCtx.decodeAudioData(buf1),
-          audioCtx.decodeAudioData(buf2)
-        ]);
+        for (let i = 0; i < responses.length; i++) {
+          const r = responses[i];
+          if (r.status === 'fulfilled' && r.value.ok) {
+            validResults.push({ id: ids[i], response: r.value });
+          } else {
+            console.warn(`音频加载失败（${ids[i]}）：${r.status === 'rejected' ? r.reason : r.value.status}`);
+          }
+        }
 
-        audioBuffer1 = decoded1;
-        audioBuffer2 = decoded2;
-        console.log(`音频加载完成：${((buf1.byteLength + buf2.byteLength) / 1024 / 1024).toFixed(1)} MB`);
+        // 并行解码成功 fetch 的音频
+        const decodedPromises = validResults.map(async ({ id, response }) => {
+          const arrayBuffer = await response.arrayBuffer();
+          const decoded = await audioCtx.decodeAudioData(arrayBuffer);
+          return { id, decoded };
+        });
+        const decodedResults = await Promise.allSettled(decodedPromises);
+
+        decodedResults.forEach(r => {
+          if (r.status === 'fulfilled') {
+            audioBuffers[r.value.id] = r.value.decoded;
+          }
+        });
+
+        console.log(`音频加载完成（${Object.keys(audioBuffers).length} 个）`);
       } catch (e) {
         console.warn("音频加载失败，将使用 SpeechSynthesis 降级：", e);
       } finally {
@@ -531,18 +719,24 @@
       }
     }
 
+    /** 向后兼容：使用默认 SOUND_MAP 预加载 */
+    function preloadAudio() {
+      return preloadAudioWithMap(SOUND_MAP);
+    }
+
     /**
-     * 播放音频
-     * @param {"peace"|"heart"} type - 手势类型，比耶播 SOUND_URL1，比心播 SOUND_URL2
+     * 播放指定手势的音频
+     * @param {string} type - 手势类型 id
      */
     function playSound(type) {
-      const buffer = type === "heart" ? audioBuffer2 : audioBuffer1;
+      const buffer = audioBuffers[type];
 
       // 降级方案：如果音频加载失败，用 SpeechSynthesis
       if (!buffer || !audioCtx) {
         if ("speechSynthesis" in window) {
           window.speechSynthesis.cancel();
-          const text = type === "heart" ? "干了这些" : "不用在意";
+          const task = TASKS.find(t => t.id === type);
+          const text = task ? task.reactionText : "太棒了";
           const utter = new SpeechSynthesisUtterance(text);
           utter.lang = "zh-CN";
           utter.rate = 1.0;
@@ -560,7 +754,6 @@
       // 每次创建一个新的 BufferSource，实现叠加播放
       const source = audioCtx.createBufferSource();
       source.buffer = buffer;
-
       source.connect(audioCtx.destination);
       source.start(0);
     }
@@ -628,6 +821,8 @@
           recognizer = rec;
           preloadReady = true;
           updateStartBtn(true, "🚀 启动摄像头并开始游戏");
+          // ★ 加载默认角色（角色1）的字幕
+          loadSubtitles('1');
         })
         .catch((err) => {
           console.warn("后台预加载失败，点击按钮后将重新尝试：", err);
@@ -874,11 +1069,29 @@
         }
       }
 
-      let detected = "none";
-      if (modelGestures.includes("Victory")) detected = "peace";
-      if (isHeartGesture(result)) detected = "heart";
+      // MediaPipe 内置类别 → 我们的任务 id 映射
+      const MEDIAPIPE_TO_TASK = {
+        "Victory":     "peace",
+        "Thumb_Up":    "thumbsup",
+        "Open_Palm":   "openpalm",
+        "Pointing_Up": "pointingup",
+        "ILoveYou":    "iloveyou",
+        "Thumb_Down":  "thumbsdown",
+      };
 
-      const readable = { none: "无", peace: "比耶 ✌️", heart: "比心 🫶" };
+      // 优先级：自定义比心 > MediaPipe 内置
+      let detected = "none";
+      if (isHeartGesture(result)) {
+        detected = "heart";
+      } else {
+        for (const g of modelGestures) {
+          const mapped = MEDIAPIPE_TO_TASK[g];
+          if (mapped) { detected = mapped; break; }
+        }
+      }
+
+      // readable 字典
+      const readable = { none: "无", peace: "比耶 ✌️", heart: "比心 🫶", thumbsup: "点赞 👍", openpalm: "停 🖐️", pointingup: "指人 ☝️", iloveyou: "我爱你 🤟", thumbsdown: "不 👎" };
       gestureText.textContent = readable[detected] || detected;
 
       const modelText = modelGestures.length ? modelGestures.join(", ") : "无";
@@ -915,33 +1128,37 @@
       scoreText.textContent = String(score);
 
       const task = TASKS.find(t => t.id === type);
+      if (!task) return;
 
-      // 播放语音：比耶播 record1，比心播 record2
+      // 播放对应的语音
       playSound(type);
 
-      // 更新气泡文字
-      speech.textContent = task.reactionText;
+      // ★ 更新气泡文字：优先显示当前角色的字幕，fallback 到 reactionText
+      const subtitle = getSubtitle(type);
+      speech.textContent = subtitle || task.reactionText;
 
       // 角色动画
-      playAvatarAnimation(type === "peace" ? "react-peace" : "react-heart");
+      playAvatarAnimation();
 
       // 飘浮特效
-      burst(task.emoji, type === "peace" ? 12 : 16);
+      burst(task.emoji, 12);
 
-      setTimeout(() => { randomTask(); }, 1700);
+      // 按每种手势设定的停留时长切换下一个任务
+      setTimeout(() => { randomTask(); }, task.textDuration);
     }
 
     function handleWrongGesture(type) {
-      const name = type === "peace" ? "比耶" : "比心";
+      const task = TASKS.find(t => t.id === type);
+      const name = task ? task.label.replace(/ .*$/, "") : type;
       speech.textContent = `识别到你做了「${name}」，但当前任务不是这个哦～`;
     }
 
-    function playAvatarAnimation(className) {
+    function playAvatarAnimation() {
       avatarImg.classList.remove("react-peace", "react-heart");
       void avatarImg.offsetWidth;
-      avatarImg.classList.add(className);
+      avatarImg.classList.add("react-peace");
       setTimeout(() => {
-        avatarImg.classList.remove(className);
+        avatarImg.classList.remove("react-peace");
       }, 2300);
     }
 
@@ -1065,6 +1282,16 @@
     function midpoint(a, b) {
       return { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2, z: ((a.z || 0) + (b.z || 0)) / 2 };
     }
+
+    // ====================================================================
+    // 角色按钮事件绑定
+    // ====================================================================
+    document.querySelectorAll('.char-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const charIndex = btn.dataset.char;
+        switchCharacter(charIndex);
+      });
+    });
 
     // ====================================================================
     // 🚀 启动入口
