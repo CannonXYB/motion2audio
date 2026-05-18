@@ -506,27 +506,15 @@
     /** 当前角色的音频映射 - 根据当前角色动态构建 */
     function currentSoundMap() {
       const base = charFolder(CURRENT_CHAR.index);
-      // 角色1 使用自定义文件名：record1.MP3（比耶）、record2.MP3（比心）
-      if (CURRENT_CHAR.index === '1') {
-        return {
-          peace:      `${base}/peace.MP3`,
-          heart:      `${base}/heart.MP3`,
-          thumbsup:   `${base}/thumbsup.mp3`,
-          openpalm:   `${base}/openpalm.mp3`,
-          pointingup: `${base}/pointingup.mp3`,
-          iloveyou:   `${base}/iloveyou.mp3`,
-          thumbsdown: `${base}/thumbsdown.mp3`,
-        };
-      }
-      // 其他角色使用通用命名规则
+      // ⚠️ 注意：所有音频文件使用大写 .MP3 扩展名（GitHub Pages 区分大小写）
       return {
-        peace:      `${base}/peace.mp3`,
-        heart:      `${base}/heart.mp3`,
-        thumbsup:   `${base}/thumbsup.mp3`,
-        openpalm:   `${base}/openpalm.mp3`,
-        pointingup: `${base}/pointingup.mp3`,
-        iloveyou:   `${base}/iloveyou.mp3`,
-        thumbsdown: `${base}/thumbsdown.mp3`,
+        peace:      `${base}/peace.MP3`,
+        heart:      `${base}/heart.MP3`,
+        thumbsup:   `${base}/thumbsup.MP3`,
+        openpalm:   `${base}/openpalm.MP3`,
+        pointingup: `${base}/pointingup.MP3`,
+        iloveyou:   `${base}/iloveyou.MP3`,
+        thumbsdown: `${base}/thumbsdown.MP3`,
       };
     }
 
